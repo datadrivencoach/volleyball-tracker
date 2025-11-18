@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Volleyball Lineup Tracker</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
     * {
       box-sizing: border-box;
@@ -15,6 +16,7 @@
       padding: 0.5rem;
       background: #111;
       color: #f5f5f5;
+      touch-action: manipulation;
     }
 
     h1 {
@@ -237,6 +239,18 @@
       font-size: 0.7rem;
       opacity: 0.8;
     }
+
+    .saved-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .saved-controls select {
+      font-size: 0.75rem;
+      max-width: 180px;
+    }
   </style>
 </head>
 <body>
@@ -295,6 +309,19 @@ DS 2"></textarea>
     </div>
   </section>
 
+  <!-- Saved games -->
+  <section>
+    <div class="status-row">
+      <div class="small-label">Saved Games (stored on this device)</div>
+      <div class="saved-controls">
+        <button id="save-game-btn">Save Game</button>
+        <select id="saved-games-select"></select>
+        <button id="load-game-btn">Load</button>
+        <button id="delete-game-btn">Delete</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Layout: Court / Bench / Subs -->
   <section class="layout">
     <div class="panel">
@@ -318,6 +345,10 @@ DS 2"></textarea>
 </div>
 
 <script>
+  // --------- Storage keys ---------
+  const STORAGE_KEY_AUTO = 'vb_lineup_auto_state_v1';
+  const STORAGE_KEY_SAVES = 'vb_lineup_saved_states_v1';
+
   // --------- State management ---------
 
   function createInitialState() {
@@ -356,6 +387,78 @@ DS 2"></textarea>
   function updateUndoButton() {
     const undoBtn = document.getElementById('undo-btn');
     undoBtn.disabled = historyStack.length === 0;
+  }
+
+  // --------- Local storage helpers ---------
+
+  function saveAutoState() {
+    try {
+      localStorage.setItem(STORAGE_KEY_AUTO, JSON.stringify(state));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+
+  function loadAutoStateIfAny() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_AUTO);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          state = parsed;
+        }
+      }
+    } catch (e) {
+      // fall back to initial state
+      state = createInitialState();
+    }
+  }
+
+  function getSavedGames() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SAVES);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function setSavedGames(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY_SAVES, JSON.stringify(list));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function refreshSavedGamesDropdown() {
+    const sel = document.getElementById('saved-games-select');
+    const loadBtn = document.getElementById('load-game-btn');
+    const delBtn = document.getElementById('delete-game-btn');
+    if (!sel) return;
+
+    const saves = getSavedGames();
+    sel.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = saves.length ? 'Select saved game…' : 'No saved games';
+    sel.appendChild(placeholder);
+
+    saves.forEach(entry => {
+      const opt = document.createElement('option');
+      opt.value = String(entry.id);
+      const dateStr = new Date(entry.timestamp).toLocaleString();
+      opt.textContent = `${entry.name} (${dateStr})`;
+      sel.appendChild(opt);
+    });
+
+    const hasSaves = saves.length > 0;
+    sel.disabled = !hasSaves;
+    loadBtn.disabled = !hasSaves;
+    delBtn.disabled = !hasSaves;
   }
 
   // --------- Helpers ---------
@@ -428,29 +531,28 @@ DS 2"></textarea>
     render();
   }
 
-    // Volleyball rotation: 1 -> 6 -> 5 -> 4 -> 3 -> 2 -> 1
-    // Internally rotation[0] = pos1, ..., rotation[5] = pos6
+  // Volleyball rotation: 1 -> 6 -> 5 -> 4 -> 3 -> 2 -> 1
+  // Internally rotation[0] = pos1, ..., rotation[5] = pos6
 
-    // "Forward" = real volleyball rotation (1 to 6)
-    function rotateForward() {
-      if (state.rotation.length < 2) return;
-      pushHistory();
-      // Left-rotate the array: [p1,p2,p3,p4,p5,p6] -> [p2,p3,p4,p5,p6,p1]
-      const first = state.rotation[0];
-      state.rotation = state.rotation.slice(1).concat([first]);
-      render();
-    }
+  // "Forward" = real volleyball rotation (1 to 6)
+  function rotateForward() {
+    if (state.rotation.length < 2) return;
+    pushHistory();
+    // Left-rotate: [p1,p2,p3,p4,p5,p6] -> [p2,p3,p4,p5,p6,p1]
+    const first = state.rotation[0];
+    state.rotation = state.rotation.slice(1).concat([first]);
+    render();
+  }
 
-    // "Backward" = reverse of that rotation (6 back to 1)
-    function rotateBackward() {
-      if (state.rotation.length < 2) return;
-      pushHistory();
-      // Right-rotate the array: [p1,p2,p3,p4,p5,p6] -> [p6,p1,p2,p3,p4,p5]
-      const last = state.rotation[state.rotation.length - 1];
-      state.rotation = [last].concat(state.rotation.slice(0, state.rotation.length - 1));
-      render();
-    }
-
+  // "Backward" = reverse of that rotation (6 back to 1)
+  function rotateBackward() {
+    if (state.rotation.length < 2) return;
+    pushHistory();
+    // Right-rotate: [p1,p2,p3,p4,p5,p6] -> [p6,p1,p2,p3,p4,p5]
+    const last = state.rotation[state.rotation.length - 1];
+    state.rotation = [last].concat(state.rotation.slice(0, state.rotation.length - 1));
+    render();
+  }
 
   function scorePoint(team) {
     pushHistory();
@@ -465,8 +567,7 @@ DS 2"></textarea>
         }
       }
       state.ourScore += 1;
-    }
-    else {
+    } else {
       if (state.serving === 'us') {
         // we served, lost rally -> they get serve, no rotation for us
         state.serving = 'them';
@@ -549,9 +650,13 @@ DS 2"></textarea>
   }
 
   function resetApp() {
-    if (!confirm("Reset app? This will clear scores, sets, points, lineup, and substitutions.")) {
+    if (!confirm("Reset app? This will clear scores, sets, points, lineup, substitutions, and saved games.")) {
       return;
     }
+    try {
+      localStorage.removeItem(STORAGE_KEY_AUTO);
+      localStorage.removeItem(STORAGE_KEY_SAVES);
+    } catch (e) {}
     state = createInitialState();
     historyStack = [];
     render();
@@ -561,6 +666,62 @@ DS 2"></textarea>
     if (historyStack.length === 0) return;
     const snapshot = historyStack.pop();
     restoreState(snapshot);
+  }
+
+  // --------- Saved games actions ---------
+
+  function saveCurrentGameAsSnapshot() {
+    const name = prompt("Name this game (e.g., 'vs Panthers Set 2'):");
+    if (!name) return;
+    const saves = getSavedGames();
+    const now = Date.now();
+    const entry = {
+      id: now,
+      name: name,
+      timestamp: now,
+      state: cloneState(state)
+    };
+    saves.push(entry);
+    setSavedGames(saves);
+    refreshSavedGamesDropdown();
+  }
+
+  function loadSelectedSavedGame() {
+    const sel = document.getElementById('saved-games-select');
+    if (!sel) return;
+    const idStr = sel.value;
+    if (!idStr) return;
+
+    const saves = getSavedGames();
+    const entry = saves.find(e => String(e.id) === idStr);
+    if (!entry) return;
+
+    if (!confirm(`Load "${entry.name}"? Current game state will be replaced.`)) {
+      return;
+    }
+
+    pushHistory();
+    state = cloneState(entry.state);
+    render();
+  }
+
+  function deleteSelectedSavedGame() {
+    const sel = document.getElementById('saved-games-select');
+    if (!sel) return;
+    const idStr = sel.value;
+    if (!idStr) return;
+
+    const saves = getSavedGames();
+    const entry = saves.find(e => String(e.id) === idStr);
+    if (!entry) return;
+
+    if (!confirm(`Delete saved game "${entry.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    const remaining = saves.filter(e => String(e.id) !== idStr);
+    setSavedGames(remaining);
+    refreshSavedGamesDropdown();
   }
 
   // --------- Rendering ---------
@@ -615,7 +776,6 @@ DS 2"></textarea>
         card.dataset.playerId = playerId;
         card.dataset.group = 'court';
 
-        // Highlight if pending sub
         if (pending && pending.group === 'court' && pending.playerId === playerId) {
           card.classList.add('sub-pending');
         }
@@ -682,11 +842,18 @@ DS 2"></textarea>
       div.textContent = `Set ${entry.setNumber} @ ${entry.score}: ${inName} in for ${outName}`;
       subsLog.appendChild(div);
     });
+
+    // Save current state automatically & refresh saved list UI
+    saveAutoState();
+    refreshSavedGamesDropdown();
   }
 
   // --------- Event wiring ---------
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Try to restore previous automatic state first
+    loadAutoStateIfAny();
+
     document.getElementById('load-lineup-btn').addEventListener('click', loadLineupFromTextarea);
     document.getElementById('rotate-forward-btn').addEventListener('click', rotateForward);
     document.getElementById('rotate-back-btn').addEventListener('click', rotateBackward);
@@ -698,8 +865,13 @@ DS 2"></textarea>
     document.getElementById('reset-btn').addEventListener('click', resetApp);
     document.getElementById('undo-btn').addEventListener('click', undoLast);
 
+    document.getElementById('save-game-btn').addEventListener('click', saveCurrentGameAsSnapshot);
+    document.getElementById('load-game-btn').addEventListener('click', loadSelectedSavedGame);
+    document.getElementById('delete-game-btn').addEventListener('click', deleteSelectedSavedGame);
+
     render();
   });
 </script>
 </body>
 </html>
+
