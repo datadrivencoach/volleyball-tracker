@@ -289,9 +289,20 @@ Middle 2
 Outside 2
 DS 1
 DS 2"></textarea>
-    <div>
-      <button id="load-lineup-btn" class="primary">Load / Update Lineup</button>
+    <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+      <button id="load-lineup-btn" class="primary">Load / Update<br>Lineup</button>
+
+      <!-- Rotation buttons moved here -->
+      <div>
+          <span class="small-label">Rotate</span>
+          
+          <button id="rotate-back-btn">◀︎</button>
+          <button id="rotate-forward-btn">▶︎</button>
+        <span class="small-label">Serving:</span>
+        <span id="serving-indicator" class="serving-indicator serving-us">Us</span>
+      </div>
     </div>
+
   </section>
 
   <!-- Status & Controls -->
@@ -302,15 +313,10 @@ DS 2"></textarea>
         <span>Us: <span id="our-score">0</span></span>
         <span>Them: <span id="their-score">0</span></span>
       </div>
-      <div>
-        <span class="small-label">Serving:</span>
-        <span id="serving-indicator" class="serving-indicator serving-us">Us</span>
-      </div>
+      
     </div>
 
     <div class="controls-row">
-      <button id="rotate-back-btn">Rotate ◀︎</button>
-      <button id="rotate-forward-btn">Rotate ▶︎</button>
 
       <button id="score-us-btn" class="primary big-score">Us +1</button>
       <button id="score-them-btn" class="primary big-score">Them +1</button>
