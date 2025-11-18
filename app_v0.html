@@ -321,7 +321,7 @@ DS 2"></textarea>
     </div>
   </section>
 
-  <!-- Layout: Court / Bench / Subs -->
+  <!-- Layout: Court / Bench / Game Log -->
   <section class="layout">
     <div class="panel">
       <h2>Court</h2>
@@ -334,7 +334,7 @@ DS 2"></textarea>
     </div>
 
     <div class="panel">
-      <h2>Substitutions Log</h2>
+      <h2>Game Log</h2>
       <div id="subs-log-list"></div>
     </div>
   </section>
@@ -358,7 +358,7 @@ DS 2"></textarea>
       setNumber: 1,
       subMode: false,
       pendingSub: null,     // {group: 'court'|'bench', playerId}
-      substitutions: [],    // {inId, outId, setNumber, score}
+      substitutions: [],    // now general game log: subs + set-end entries
       nextPlayerId: 1
     };
   }
@@ -623,7 +623,9 @@ DS 2"></textarea>
     state.rotation = state.rotation.map(id => id === courtId ? benchId : id);
     state.bench = state.bench.map(id => id === benchId ? courtId : id);
 
+    // Log substitution in game log (newest first)
     state.substitutions.unshift({
+      kind: 'sub',
       inId: benchId,
       outId: courtId,
       setNumber: state.setNumber,
@@ -636,6 +638,15 @@ DS 2"></textarea>
 
   function newSet() {
     pushHistory();
+
+    // Log final score of the set we're ending
+    state.substitutions.unshift({
+      kind: 'setEnd',
+      setNumber: state.setNumber,
+      score: state.ourScore + "-" + state.theirScore
+    });
+
+    // Advance to next set and reset scores
     state.setNumber += 1;
     state.ourScore = 0;
     state.theirScore = 0;
@@ -826,15 +837,22 @@ DS 2"></textarea>
       benchList.appendChild(card);
     });
 
-    // Subs log
+    // Game log (subs + set ends)
     const subsLog = document.getElementById('subs-log-list');
     subsLog.innerHTML = '';
     state.substitutions.forEach(entry => {
       const div = document.createElement('div');
       div.className = 'sub-entry';
-      const inName = getPlayerName(entry.inId);
-      const outName = getPlayerName(entry.outId);
-      div.textContent = `Set ${entry.setNumber} @ ${entry.score}: ${inName} in for ${outName}`;
+
+      if (entry.kind === 'setEnd') {
+        div.textContent = `End Set ${entry.setNumber}: ${entry.score}`;
+      } else {
+        // treat as substitution (backward compatible with older saves)
+        const inName = getPlayerName(entry.inId);
+        const outName = getPlayerName(entry.outId);
+        div.textContent = `Set ${entry.setNumber} @ ${entry.score}: ${inName} in for ${outName}`;
+      }
+
       subsLog.appendChild(div);
     });
 
