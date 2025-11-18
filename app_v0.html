@@ -260,8 +260,7 @@
   <!-- Lineup Import -->
   <section id="import-area">
     <label for="lineup-input" class="small-label">
-      Lineup import (one name per line; first 6 = positions 1–6 in rotation order).<br>
-      Diagram orientation: top row is near the net; bottom-right is Position 1 (server).
+      Lineup (one name per line in serving order) then bench (any order).
     </label>
     <textarea id="lineup-input" placeholder="e.g.
 Setter
@@ -325,11 +324,8 @@ DS 2"></textarea>
   <!-- Layout: Court / Bench / Subs -->
   <section class="layout">
     <div class="panel">
-      <h2>Court (2–3–4 front, 5–6–1 back)</h2>
+      <h2>Court</h2>
       <div id="court"></div>
-      <div class="note">
-        Standing at the bottom edge: front row is near the net; Position 1 is bottom-right (server).
-      </div>
     </div>
 
     <div class="panel">
@@ -409,7 +405,6 @@ DS 2"></textarea>
         }
       }
     } catch (e) {
-      // fall back to initial state
       state = createInitialState();
     }
   }
@@ -874,4 +869,3 @@ DS 2"></textarea>
 </script>
 </body>
 </html>
-
